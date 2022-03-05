@@ -1,3 +1,5 @@
+-- SAMPLE DATABASE TO PRACTISE
+
 CREATE TABLE mytable(country VARCHAR, date DATE, daily_vaccinations FLOAT, vaccines VARCHAR);
 
 INSERT INTO mytable(country,date,daily_vaccinations,vaccines) VALUES ('Argentina','12/29/2020',NULL,'Sputnik V');
@@ -43,18 +45,34 @@ INSERT INTO mytable(country,date,daily_vaccinations,vaccines) VALUES ('Wales','1
 INSERT INTO mytable(country,date,daily_vaccinations,vaccines) VALUES ('Kuwait','12/13/2020',NULL,'Oxford/AstraZeneca, Pfizer/BioNTech');
 INSERT INTO mytable(country,date,daily_vaccinations,vaccines) VALUES ('Wales','12/13/2020',NULL,'Oxford/AstraZeneca, Pfizer/BioNTech');
 
--- Firstly, find the countries with invalid records. If a country has all daily_vaccinations values as NaN, that means it has invalid records.
--- The query that is shown below finds the countries that has only NaN vaccination values. Then, updates the relevant cell with 0 value.
-UPDATE mytable SET daily_vaccinations=0 WHERE country in (SELECT selected_country FROM (SELECT country AS selected_country, c FROM (SELECT country, count(country) AS c, daily_vaccinations FROM mytable GROUP BY country) WHERE c = (SELECT sum(CASE WHEN daily_vaccinations IS NULL then 1 ELSE 0 end) FROM mytable WHERE country = selected_country)));
+-- Firstly, find the countries with invalid records. If a country has all daily_vaccinations values as NaN/NULL, that means it has invalid records.
+-- The query that is shown below compares the amount of records of the relevant country and the number of null records, so if these numbers are same, the country will be count as an invalid country.
+-- The countries that is in the result of the query which is used with the WHERE clause will be updated by 0 value.
+UPDATE mytable SET daily_vaccinations=0 WHERE country IN (SELECT country FROM mytable GROUP BY country HAVING sum(CASE WHEN daily_vaccinations IS NULL then 1 ELSE 0 end) = COUNT(country))
 
+-- That is a function to extract an individual table for each country to find the median in an easier way. The "countryname" is variable for the country column.
+-- The selected values are only country and daily_vaccinations since the rest is redundant. Finally, it returns the result when input matches the current country.
+CREATE function finder (countryname varchar) 
+	returns TABLE (
+		new_country VARCHAR,
+	    new_daily_vaccinations float
+	) 
+	language plpgsql
+AS $$
+BEGIN
+	return query 
+		SELECT
+			country,
+			daily_vaccinations
+		FROM
+			mytable
+		WHERE
+			country = countryname;
+end;$$
 
--- Next, the following query uses 2 cases. First case works when the table's length is an odd number, and second case works when the table's length is an even number.
--- With the use of ROW_NUMBER function, after sorting the vaccination values, for case 1; the (N+1)/2th item gets found and then replace with NaN values.
--- However, for case 2, the Nth and (N+1)th items get found and their averages gets replaced with NaN values.
-UPDATE mytable SET daily_vaccinations= CASE --Update with the case ...
-WHEN (SELECT count(country) FROM mytable)%2=1 THEN (SELECT daily_vaccinations FROM (SELECT ROW_NUMBER() OVER (ORDER BY daily_vaccinations DESC) AS nth, daily_vaccinations FROM mytable) AS result WHERE nth = (SELECT count(daily_vaccinations)/2 FROM mytable)+1) --If the table has odd number of rows
-WHEN (SELECT count(country) FROM mytable)%2=0 THEN (SELECT AVG(daily_vaccinations) FROM (SELECT daily_vaccinations FROM (SELECT ROW_NUMBER() OVER (ORDER BY daily_vaccinations DESC) AS nth, daily_vaccinations FROM mytable) AS result WHERE nth in ((SELECT count(daily_vaccinations) FROM mytable)/2+1, (SELECT count(daily_vaccinations) FROM mytable)/2))) --If the table has even number of rows
-END
-WHERE daily_vaccinations IS NULL; --Where the null vaccinations exist
-
-SELECT * FROM mytable;
+-- Updating the table using percentile_cont (to sort and get the half of the chosen table) and the function "finder" to get the exact country's median and set it on where the NULL values exist.
+UPDATE mytable
+SET daily_vaccinations=(SELECT PERCENTILE_CONT(0.5)
+WITHIN GROUP(ORDER BY new_daily_vaccinations)
+FROM (SELECT * FROM finder(country)) AS results)
+WHERE daily_vaccinations IS NULL
