@@ -20,7 +20,7 @@ for record in groupped_records: # Iterate over groupped records
     """ if the country matches the index - in .loc[] section - which is called "record", and if it has nan values,
     change it by the minimum value of the current index(country) """
 
-df.to_csv("ImputedData.csv", encoding="utf-8", index=False) # Save the new imputed dataset
+#df.to_csv("ImputedData.csv", encoding="utf-8", index=False) # Save the new imputed dataset
 
 top_three = df.groupby('country')['daily_vaccinations'].median().sort_values()[::-1][:3] # Group countries by daily vaccinations by their medians, then sort values and then reverse output to get first three(top) values.
 print(top_three)
