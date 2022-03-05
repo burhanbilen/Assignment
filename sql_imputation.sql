@@ -48,7 +48,7 @@ INSERT INTO mytable(country,date,daily_vaccinations,vaccines) VALUES ('Wales','1
 -- Firstly, find the countries with invalid records. If a country has all daily_vaccinations values as NaN/NULL, that means it has invalid records.
 -- The query that is shown below compares the amount of records of the relevant country and the number of null records, so if these numbers are same, the country will be count as an invalid country.
 -- The countries that is in the result of the query which is used with the WHERE clause will be updated by 0 value.
-UPDATE mytable SET daily_vaccinations=0 WHERE country IN (SELECT country FROM mytable GROUP BY country HAVING sum(CASE WHEN daily_vaccinations IS NULL then 1 ELSE 0 end) = COUNT(country))
+UPDATE mytable SET daily_vaccinations=0 WHERE country IN (SELECT country FROM mytable GROUP BY country HAVING sum(CASE WHEN daily_vaccinations IS NULL then 1 ELSE 0 end) = COUNT(country));
 
 -- That is a function to extract an individual table for each country to find the median in an easier way. The "countryname" is variable for the country column.
 -- The selected values are only country and daily_vaccinations since the rest is redundant. Finally, it returns the result when input matches the current country.
@@ -68,11 +68,11 @@ BEGIN
 			mytable
 		WHERE
 			country = countryname;
-end;$$
+end;$$;
 
 -- Updating the table using percentile_cont (to sort and get the half of the chosen table) and the function "finder" to get the exact country's median and set it on where the NULL values exist.
 UPDATE mytable
 SET daily_vaccinations=(SELECT PERCENTILE_CONT(0.5)
 WITHIN GROUP(ORDER BY new_daily_vaccinations)
 FROM (SELECT * FROM finder(country)) AS results)
-WHERE daily_vaccinations IS NULL
+WHERE daily_vaccinations IS NULL;
